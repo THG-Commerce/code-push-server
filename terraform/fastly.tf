@@ -47,9 +47,15 @@ resource "fastly_service_vcl" "codepush_service" {
   
   # Conditions for different request types
   condition {
-    name      = "api_requests"
+    name      = "cli_operations"
     type      = "REQUEST"
-    statement = "req.url ~ \"^/api/\""
+    statement = "req.url ~ \"^/(api/|accessKeys|account|apps/)\" && !(req.url ~ \"^/(updateCheck|v0\\.1/public/codepush/update_check)\")"
+  }
+  
+  condition {
+    name      = "app_update_checks"
+    type      = "REQUEST"
+    statement = "req.url ~ \"^/(updateCheck|v0\\.1/public/codepush/update_check)\""
   }
   
   condition {
@@ -64,6 +70,12 @@ resource "fastly_service_vcl" "codepush_service" {
     statement = "req.url ~ \"^/packages/\" || req.url ~ \"\\.zip$\""
   }
   
+  condition {
+    name      = "status_reporting"
+    type      = "REQUEST"
+    statement = "req.url ~ \"^/(reportStatus|v0\\.1/public/codepush/report_status)\""
+  }
+  
   # Response conditions
   condition {
     name      = "cacheable_response"
@@ -71,32 +83,43 @@ resource "fastly_service_vcl" "codepush_service" {
     statement = "beresp.status == 200 && beresp.http.Cache-Control !~ \"no-cache|no-store|private\""
   }
   
-  # Headers for API requests
+  # Headers for CLI operations (bypass cache completely)
   header {
-    name        = "api_cors_origin"
+    name        = "cli_bypass_cache"
     action      = "set"
-    type        = "response"
-    destination = "http.Access-Control-Allow-Origin"
-    source      = "\"*\""
-    request_condition   = "api_requests"
+    type        = "request"
+    destination = "http.X-Pass"
+    source      = "\"1\""
+    request_condition = "cli_operations"
   }
   
   header {
-    name        = "api_cors_methods"
+    name        = "cli_cache_control"
     action      = "set"
     type        = "response"
-    destination = "http.Access-Control-Allow-Methods"
-    source      = "\"GET, POST, PUT, DELETE, OPTIONS\""
-    request_condition   = "api_requests"
+    destination = "http.Cache-Control"
+    source      = "\"no-cache, no-store, must-revalidate\""
+    request_condition = "cli_operations"
   }
   
+  # Headers for status reporting (bypass cache)
   header {
-    name        = "api_cors_headers"
+    name        = "status_bypass_cache"
+    action      = "set"
+    type        = "request"
+    destination = "http.X-Pass"
+    source      = "\"1\""
+    request_condition = "status_reporting"
+  }
+  
+  # Headers for app update checks (limited caching)
+  header {
+    name        = "update_cache_control"
     action      = "set"
     type        = "response"
-    destination = "http.Access-Control-Allow-Headers"
-    source      = "\"Content-Type, Authorization, X-CodePush-SDK-Version\""
-    request_condition   = "api_requests"
+    destination = "http.Cache-Control"
+    source      = "\"public, max-age=300, s-maxage=300\""
+    request_condition = "app_update_checks"
   }
   
   # Caching headers for static assets
@@ -117,6 +140,34 @@ resource "fastly_service_vcl" "codepush_service" {
     destination = "http.Cache-Control"
     source      = "\"public, max-age=86400\""
     request_condition   = "package_downloads"
+  }
+  
+  # CORS headers for app update checks
+  header {
+    name        = "update_cors_origin"
+    action      = "set"
+    type        = "response"
+    destination = "http.Access-Control-Allow-Origin"
+    source      = "\"*\""
+    request_condition = "app_update_checks"
+  }
+  
+  header {
+    name        = "update_cors_methods"
+    action      = "set"
+    type        = "response"
+    destination = "http.Access-Control-Allow-Methods"
+    source      = "\"GET, POST, OPTIONS\""
+    request_condition = "app_update_checks"
+  }
+  
+  header {
+    name        = "update_cors_headers"
+    action      = "set"
+    type        = "response"
+    destination = "http.Access-Control-Allow-Headers"
+    source      = "\"Content-Type, Authorization, X-CodePush-SDK-Version\""
+    request_condition = "app_update_checks"
   }
   
   # Security headers
