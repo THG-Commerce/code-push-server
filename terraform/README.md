@@ -1,14 +1,16 @@
 # CodePush Server - GCP Terraform Deployment
 
-This Terraform configuration deploys the CodePush Server to Google Cloud Platform using Cloud Run, Redis, and supporting infrastructure.
+This Terraform configuration deploys the CodePush Server to Google Cloud Platform using VM-based deployment.
 
 ## Architecture
 
-- **Cloud Run**: Hosts the containerized CodePush server application
-- **Redis (Memorystore)**: Provides caching and session storage
-- **VPC**: Private network for secure communication
-- **Cloud Build**: Automated CI/CD pipeline with GitHub integration
-- **Load Balancer**: Optional custom domain support with SSL
+- **Compute Engine VM**: Hosts the containerized CodePush server application
+- **Redis**: Local Redis server running on the VM for caching and session storage
+- **Nginx**: Reverse proxy with SSL termination via Let's Encrypt
+- **VPC**: Private network with firewall rules for security
+- **Cloud Storage**: Backend storage for CodePush packages
+- **Cloud Build**: Automated CI/CD pipeline with GitHub integration (optional)
+- **Fastly CDN**: Global content delivery network for performance (optional)
 
 ## Prerequisites
 
@@ -61,7 +63,7 @@ terraform apply
 
 ### 4. Build and Deploy Container
 
-After the infrastructure is deployed, you need to build and push your container:
+After the infrastructure is deployed, build and push your container:
 
 ```bash
 # Build the container image
@@ -71,25 +73,24 @@ docker build -t gcr.io/YOUR_PROJECT_ID/codepush:latest .
 # Push to Google Container Registry
 docker push gcr.io/YOUR_PROJECT_ID/codepush:latest
 
-# Update Cloud Run service
-gcloud run deploy codepush-server \
-  --image gcr.io/YOUR_PROJECT_ID/codepush:latest \
-  --region us-central1 \
-  --platform managed
+# The VM will automatically pull and run the latest image
+# Or manually restart the container on the VM:
+gcloud compute ssh codepush-vm --zone=us-central1-a --command="sudo /opt/codepush/run-container.sh"
 ```
 
 ## Configuration Options
 
+### VM Configuration
+
+- `vm_machine_type`: VM instance type (e.g., e2-standard-2, e2-micro)
+- `vm_disk_size_gb`: Boot disk size in GB
+- `vm_disk_type`: Disk type (pd-standard, pd-ssd)
+- `ssh_public_key`: SSH public key for VM access
+
 ### Redis Configuration
 
-- `redis_tier`: Choose between "BASIC" or "STANDARD_HA"
-- `redis_memory_size_gb`: Memory allocation for Redis instance
-
-### Cloud Run Configuration
-
-- `min_instances`/`max_instances`: Auto-scaling configuration
-- `cpu_limit`/`memory_limit`: Resource limits
-- `allow_public_access`: Whether to allow public internet access
+Redis runs locally on the VM with password authentication:
+- `redis_password`: Password for Redis (auto-generated if empty)
 
 ### Application Configuration
 
@@ -151,10 +152,18 @@ To update the application:
 ## Costs
 
 Estimated monthly costs (us-central1):
-- Cloud Run: $0-50 (depending on usage)
-- Redis (1GB Basic): ~$35
-- VPC/Networking: ~$5
-- Total: ~$40-90/month
+
+- **Compute Engine VM** (e2-standard-2): ~$30-60/month
+- **Storage** (GCS): ~$5-20/month 
+- **Networking** (VPC, static IP): ~$5-10/month
+- **Fastly CDN** (optional): Variable based on traffic
+- **Total**: ~$40-90/month + Fastly costs
+
+### Cost Optimization Tips
+- Consider smaller VM types (e2-micro, e2-small) for development environments
+- Enable **Fastly CDN** to reduce origin server bandwidth costs and improve global performance
+- Use storage lifecycle policies to automatically clean up old packages
+- Monitor usage and scale VM size based on actual resource needs
 
 ## Troubleshooting
 
