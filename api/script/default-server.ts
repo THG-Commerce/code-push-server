@@ -3,6 +3,7 @@
 
 import * as api from "./api";
 import { AzureStorage } from "./storage/azure-storage";
+import { GCSStorage } from "./storage/gcs-storage";
 import { fileUploadMiddleware } from "./file-upload-manager";
 import { JsonStorage } from "./storage/json-storage";
 import { RedisManager } from "./redis-manager";
@@ -43,6 +44,14 @@ export function start(done: (err?: any, server?: express.Express, storage?: Stor
     .then(async () => {
       if (useJsonStorage) {
         storage = new JsonStorage();
+      } else if (process.env.STORAGE_TYPE === "gcs" || process.env.GCS_BUCKET_NAME) {
+        // Use Google Cloud Storage
+        storage = new GCSStorage({
+          projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT_ID,
+          bucketName: process.env.GCS_BUCKET_NAME || process.env.GCP_BUCKET_NAME,
+          keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+          credentials: process.env.GCP_CREDENTIALS ? JSON.parse(process.env.GCP_CREDENTIALS) : undefined
+        });
       } else if (!process.env.AZURE_KEYVAULT_ACCOUNT) {
         storage = new AzureStorage();
       } else {

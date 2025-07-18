@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  code-push-server:
+    build: .
+    ports:
+      - "3000:3000"
+      - "8443:8443"
+    environment:
+      # Basic configuration
+      - SERVER_URL=http://localhost:3000
+      - EMULATED=true
+      - LOGGING=true
+      - ENABLE_ACCOUNT_REGISTRATION=true
+      - UPLOAD_SIZE_LIMIT_MB=200
+      
+      # Disable authentication for development (remove in production)
+      - DEBUG_DISABLE_AUTH=true
+      
+      # Optional: Enable HTTPS (uncomment and provide certificates)
+      # - HTTPS=true
+      
+      # Redis configuration
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      
+    # volumes:
+      # Optional: Mount certificates for HTTPS
+      # - ./certs:/app/certs:ro
+      
+      # Optional: Mount environment file
+      # - ./.env:/app/.env:ro
+      
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http = require('http'); const options = { host: 'localhost', port: process.env.API_PORT || process.env.PORT || 3000, timeout: 2000 }; const request = http.request(options, (res) => { process.exit(0); }); request.on('error', () => { process.exit(1); }); request.end();"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis service
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+# Volumes for Redis
+volumes:
+  redis_data:

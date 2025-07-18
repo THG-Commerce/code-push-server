@@ -1,0 +1,56 @@
+# Required Variables
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+
+# Service Configuration
+name_prefix = "codepush"
+
+# VM Configuration
+vm_machine_type = "e2-standard-2"
+vm_disk_size_gb = 50
+vm_disk_type    = "pd-standard"
+
+# Storage Configuration
+storage_location              = "US"    # "US", "EU", or specific region like "us-central1"
+storage_versioning_enabled    = true
+storage_lifecycle_age_days    = 365     # Delete objects older than 1 year
+storage_force_destroy         = false   # Set to true for dev environments only
+
+# SSH Configuration
+ssh_public_key     = ""  # Your SSH public key for VM access
+ssh_source_ranges  = ["0.0.0.0/0"]  # IP ranges allowed for SSH
+allowed_source_ranges = ["0.0.0.0/0"]  # IP ranges allowed for HTTP/HTTPS
+
+# Application Configuration
+server_url                   = ""     # Server URL for the CodePush server
+emulated_mode               = false   # Set to true for development
+enable_logging              = true
+enable_account_registration = true
+upload_size_limit_mb        = 200
+
+# Additional environment variables (optional)
+additional_env_vars = {
+  # "DEBUG_DISABLE_AUTH" = "false"
+  # "HTTPS" = "false"
+}
+
+# Redis Configuration for VM
+redis_password = ""  # Leave empty to auto-generate
+
+# Network Configuration
+custom_domain = ""  # Optional: your custom domain
+
+# CI/CD Configuration (GitHub)
+enable_cicd   = true
+github_owner  = "your-github-username"
+github_repo   = "code-push-server"
+github_branch = "main"
+
+enable_fastly = true
+
+# Labels
+labels = {
+  environment = "production"
+  application = "codepush-server"
+  managed-by  = "terraform"
+}
